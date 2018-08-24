@@ -226,16 +226,36 @@ class Persistence {
     #endif // DECIDE
 
     class private func unarchiveWithFilePath(_ filePath: String) -> Any? {
-        let unarchivedData: Any? = NSKeyedUnarchiver.unarchiveObject(withFile: filePath)
-        if unarchivedData == nil {
+        if #available(iOS 9.0, *) {
+            guard let rawFileData = NSData.init(contentsOfFile: filePath) as Data? else {
+                return nil;
+            }
             do {
-                try FileManager.default.removeItem(atPath: filePath)
-            } catch {
-                Logger.info(message: "Unable to remove file at path: \(filePath)")
+                let unarchivedData: Any? = try NSKeyedUnarchiver.unarchiveTopLevelObjectWithData(rawFileData)
+                if unarchivedData == nil {
+                    removeArchivedFile(atPath: filePath)
+                }
+                return unarchivedData
+            } catch let err {
+                Logger.info(message: "Unable to read file at path: \(filePath), error: \(err)")
+                return nil
             }
         }
-
-        return unarchivedData
+        else {
+            let unarchivedData: Any? = NSKeyedUnarchiver.unarchiveObject(withFile: filePath)
+            if unarchivedData == nil {
+                removeArchivedFile(atPath: filePath)
+            }
+            return unarchivedData
+        }
+    }
+    
+    class private func removeArchivedFile(atPath filePath: String) {
+        do {
+            try FileManager.default.removeItem(atPath: filePath)
+        } catch let err {
+            Logger.info(message: "Unable to remove file at path: \(filePath), error: \(err)")
+        }
     }
 
     class private func unarchiveEvents(token: String) -> Queue {
